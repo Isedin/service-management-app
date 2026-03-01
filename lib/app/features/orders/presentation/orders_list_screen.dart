@@ -20,22 +20,34 @@ class OrdersListScreen extends ConsumerWidget {
           ),
         ],
       ),
-      body: Column(
-        children: [
-          Padding(
-            padding: const EdgeInsets.all(12),
-            child: TextField(
-              decoration: const InputDecoration(
-                labelText: 'Pretraga (ime ili telefon)',
-                border: OutlineInputBorder(),
+
+      // Tap bilo gdje da ugasi keyboard (da ne “pojede” klikove)
+      body: GestureDetector(
+        behavior: HitTestBehavior.opaque,
+        onTap: () => FocusScope.of(context).unfocus(),
+        child: Column(
+          children: [
+            Padding(
+              padding: const EdgeInsets.all(12),
+              child: TextField(
+                keyboardType: TextInputType.text,
+                textInputAction: TextInputAction.search,
+                decoration: const InputDecoration(
+                  labelText: 'Pretraga (ime ili telefon)',
+                  border: OutlineInputBorder(),
+                ),
+                onChanged: (v) =>
+                    ref.read(ordersProvider.notifier).setSearch(v),
               ),
-              onChanged: (v) => ref.read(ordersProvider.notifier).setSearch(v),
             ),
-          ),
-          Expanded(
-            child: p.isLoading
-                ? const Center(child: CircularProgressIndicator())
-                : ListView.builder(
+
+            Expanded(
+              child: Stack(
+                children: [
+                  // Lista je uvijek tu
+                  ListView.builder(
+                    keyboardDismissBehavior:
+                        ScrollViewKeyboardDismissBehavior.onDrag,
                     itemCount: p.orders.length,
                     itemBuilder: (_, i) {
                       final o = p.orders[i];
@@ -52,6 +64,7 @@ class OrdersListScreen extends ConsumerWidget {
                           color: notDone ? Colors.red : Colors.green,
                         ),
                         onTap: () {
+                          FocusScope.of(context).unfocus();
                           Navigator.push(
                             context,
                             MaterialPageRoute(
@@ -62,8 +75,38 @@ class OrdersListScreen extends ConsumerWidget {
                       );
                     },
                   ),
-          ),
-        ],
+
+                  // Loading overlay koji NE blokira tapove
+                  if (p.isLoading)
+                    const IgnorePointer(
+                      ignoring: true,
+                      child: Center(child: CircularProgressIndicator()),
+                    ),
+
+                  // Error poruka (ne blokira ništa)
+                  if (p.error != null)
+                    Align(
+                      alignment: Alignment.bottomCenter,
+                      child: Padding(
+                        padding: const EdgeInsets.all(12),
+                        child: Material(
+                          elevation: 2,
+                          borderRadius: BorderRadius.circular(12),
+                          child: Padding(
+                            padding: const EdgeInsets.all(12),
+                            child: Text(
+                              p.error!,
+                              style: const TextStyle(color: Colors.red),
+                            ),
+                          ),
+                        ),
+                      ),
+                    ),
+                ],
+              ),
+            ),
+          ],
+        ),
       ),
     );
   }

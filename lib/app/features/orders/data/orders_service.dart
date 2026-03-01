@@ -4,6 +4,7 @@ import '../domain/order_model.dart';
 class OrdersService {
   OrdersService(this._client);
   final SupabaseClient _client;
+  // final _uuid = const Uuid();
 
   Future<List<OrderModel>> fetchOrders({String? search}) async {
     final data = await _client
@@ -51,6 +52,7 @@ class OrdersService {
     required String orderId,
     required double lengthCm,
     required double widthCm,
+    required String itemId,
   }) async {
     await _client.rpc(
       'add_measured_carpet_cm',
@@ -58,6 +60,7 @@ class OrdersService {
         'p_order_id': orderId,
         'p_length_cm': lengthCm,
         'p_width_cm': widthCm,
+        'p_item_id': itemId,
       },
     );
   }
@@ -66,6 +69,31 @@ class OrdersService {
     await _client.rpc(
       'close_and_delete_order',
       params: {'p_order_id': orderId},
+    );
+  }
+
+  Future<List<Map<String, dynamic>>> fetchOrderItems(String orderId) async {
+    final data = await _client
+        .from('order_items')
+        .select()
+        .eq('order_id', orderId)
+        .order('created_at', ascending: true);
+
+    return (data as List).cast<Map<String, dynamic>>();
+  }
+
+  Future<void> updateCarpetItemCm({
+    required String itemId,
+    required double lengthCm,
+    required double widthCm,
+  }) async {
+    await _client.rpc(
+      'update_carpet_item_cm',
+      params: {
+        'p_item_id': itemId,
+        'p_length_cm': lengthCm,
+        'p_width_cm': widthCm,
+      },
     );
   }
 }

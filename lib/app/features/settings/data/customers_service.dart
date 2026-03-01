@@ -4,6 +4,23 @@ class CustomersService {
   final SupabaseClient _client;
   CustomersService(this._client);
 
+  Future<List<Map<String, dynamic>>> searchCustomers(String query) async {
+    final q = query.trim();
+    if (q.isEmpty) return [];
+
+    final businessId = await _client.rpc('current_business_id');
+
+    final data = await _client
+        .from('customers')
+        .select('id, full_name, phone')
+        .eq('business_id', businessId)
+        .or('full_name.ilike.%$q%,phone.ilike.%$q%')
+        .order('last_order_at', ascending: false)
+        .limit(10);
+
+    return (data as List).cast<Map<String, dynamic>>();
+  }
+
   Future<String> upsertCustomer({
     required String fullName,
     required String phone,

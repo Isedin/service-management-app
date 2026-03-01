@@ -90,13 +90,16 @@ class OrdersNotifier extends Notifier<OrdersState> {
     String orderId,
     double lCm,
     double wCm,
+    String itemId,
   ) async {
     state = state.copyWith(error: null);
     try {
+      print("ADD CARPET CALLED: $itemId");
       await _service.addMeasuredCarpetCm(
         orderId: orderId,
         lengthCm: lCm,
         widthCm: wCm,
+        itemId: itemId,
       );
       await load();
     } catch (e) {
@@ -109,6 +112,20 @@ class OrdersNotifier extends Notifier<OrdersState> {
     try {
       await _service.closeAndDeleteOrder(orderId);
       await load();
+    } catch (e) {
+      state = state.copyWith(error: e.toString());
+    }
+  }
+
+  Future<void> updateCarpetItemCm(String itemId, double lCm, double wCm) async {
+    state = state.copyWith(error: null);
+    try {
+      await _service.updateCarpetItemCm(
+        itemId: itemId,
+        lengthCm: lCm,
+        widthCm: wCm,
+      );
+      await load(); // osvježi orders list (total_amount, itd)
     } catch (e) {
       state = state.copyWith(error: e.toString());
     }
