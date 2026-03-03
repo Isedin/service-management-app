@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:service_manegement_app/app/features/orders/state/business_provider.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
 import 'package:service_manegement_app/app/features/auth/presentation/login_screen.dart';
 import '../state/orders_provider.dart';
@@ -23,14 +24,21 @@ class _DashboardScreenState extends ConsumerState<DashboardScreen> {
   @override
   Widget build(BuildContext context) {
     final p = ref.watch(ordersProvider);
+    final bizAsync = ref.watch(businessProvider);
 
     return Scaffold(
       appBar: AppBar(
-        title: const Text('Dashboard'),
+        title: bizAsync.when(
+          data: (biz) => Text((biz['name'] ?? 'Dashboard').toString()),
+          loading: () => const Text('Dashboard'),
+          error: (_, __) => const Text('Dashboard'),
+        ),
         actions: [
           IconButton(
             onPressed: () async {
               await Supabase.instance.client.auth.signOut();
+              // očisti cached business podatke nakon logout-a
+              ref.invalidate(businessProvider);
               if (!mounted) return;
               Navigator.pushReplacement(
                 context,

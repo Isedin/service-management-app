@@ -1,8 +1,11 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:service_manegement_app/app/features/orders/data/orders_service.dart';
+import 'package:service_manegement_app/core/ui/snack.dart';
 import 'package:uuid/uuid.dart';
+
 import '../state/orders_provider.dart';
+import '../state/sms_ready_provider.dart';
 
 class OrderDetailScreen extends ConsumerStatefulWidget {
   final String orderId;
@@ -19,10 +22,23 @@ class _OrderDetailScreenState extends ConsumerState<OrderDetailScreen> {
   void initState() {
     super.initState();
     _service = ref.read(ordersServiceProvider);
+
+    // ✅ init SMS state za ovaj order
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      ref.read(smsReadyProvider.notifier).init(widget.orderId);
+    });
+  }
+
+  String _hhmm(DateTime dt) {
+    final t = dt.toLocal();
+    final h = t.hour.toString().padLeft(2, '0');
+    final m = t.minute.toString().padLeft(2, '0');
+    return '$h:$m';
   }
 
   @override
   Widget build(BuildContext context) {
+    print("ORDER DETAIL orderId: ${widget.orderId}");
     final p = ref.watch(ordersProvider);
 
     final order = p.orders.any((x) => x.id == widget.orderId)
@@ -45,7 +61,18 @@ class _OrderDetailScreenState extends ConsumerState<OrderDetailScreen> {
 
     final notDone = order.measuredCarpetCount < order.plannedCarpetCount;
     final canAddCarpet = order.measuredCarpetCount < order.plannedCarpetCount;
-    final canClose = !canAddCarpet;
+    final canClose = !canAddCarpet; // tek kad su svi tepisi uneseni
+
+    final smsState = ref.watch(smsReadyProvider);
+    final smsNotifier = ref.read(smsReadyProvider.notifier);
+
+    String label = "Pošalji SMS: Tepisi gotovi";
+    if (smsState.alreadySent && smsState.sentAt != null) {
+      final t = smsState.sentAt!.toLocal();
+      final hh = t.hour.toString().padLeft(2, '0');
+      final mm = t.minute.toString().padLeft(2, '0');
+      label = "Poslano u $hh:$mm";
+    }
 
     return Scaffold(
       appBar: AppBar(
@@ -79,7 +106,6 @@ class _OrderDetailScreenState extends ConsumerState<OrderDetailScreen> {
               const SizedBox(height: 16),
 
               FutureBuilder<List<Map<String, dynamic>>>(
-                // key neka zavisi od measuredCarpetCount da se refreshuje kad dodaš/izmijeniš
                 key: ValueKey(
                   'items-${order.measuredCarpetCount}-${order.totalAmount}',
                 ),
@@ -129,10 +155,10 @@ class _OrderDetailScreenState extends ConsumerState<OrderDetailScreen> {
                                 const Divider(),
                                 ...carpets.map((c) {
                                   final lCm =
-                                      (((c['length_m'] as num?) ?? 0) * 100)
+                                      ((((c['length_m'] as num?) ?? 0) * 100))
                                           .round();
                                   final wCm =
-                                      (((c['width_m'] as num?) ?? 0) * 100)
+                                      ((((c['width_m'] as num?) ?? 0) * 100))
                                           .round();
                                   final total =
                                       (((c['line_total'] as num?) ?? 0))
@@ -197,7 +223,6 @@ class _OrderDetailScreenState extends ConsumerState<OrderDetailScreen> {
                 },
               ),
 
-              // da bottom bar ne prekrije sadržaj
               const SizedBox(height: 120),
             ],
           ),
@@ -210,6 +235,7 @@ class _OrderDetailScreenState extends ConsumerState<OrderDetailScreen> {
           child: Column(
             mainAxisSize: MainAxisSize.min,
             children: [
+              // 1) Add carpet
               SizedBox(
                 width: double.infinity,
                 child: ElevatedButton(
@@ -218,6 +244,49 @@ class _OrderDetailScreenState extends ConsumerState<OrderDetailScreen> {
                 ),
               ),
               const SizedBox(height: 12),
+
+              // 2) SMS button (samo kad je order “gotov”)
+              SizedBox(
+                width: double.infinity,
+                child: ElevatedButton.icon(
+                  onPressed:
+                      (!canClose || smsState.isLoading || smsState.alreadySent)
+                      ? null
+                      : () async {
+                          final ok = await smsNotifier.send(
+                            message:
+                                "Poštovani, Vaši tepisi su gotovi. Možete ih preuzeti. Hvala!",
+                          );
+
+                          if (!context.mounted) return;
+
+                          if (ok) {
+                            showSnackBar(
+                              context,
+                              "SMS poslan klijentu.",
+                              Colors.green,
+                            );
+                          } else {
+                            showSnackBar(
+                              context,
+                              smsState.error ?? "Greška pri slanju SMS-a.",
+                              Colors.red,
+                            );
+                          }
+                        },
+                  icon: smsState.isLoading
+                      ? const SizedBox(
+                          width: 16,
+                          height: 16,
+                          child: CircularProgressIndicator(strokeWidth: 2),
+                        )
+                      : const Icon(Icons.sms),
+                  label: Text(label),
+                ),
+              ),
+              const SizedBox(height: 12),
+
+              // 3) Close
               SizedBox(
                 width: double.infinity,
                 child: ElevatedButton(
@@ -252,10 +321,7 @@ class _OrderDetailScreenState extends ConsumerState<OrderDetailScreen> {
     final lengthCtrl = TextEditingController();
     final widthCtrl = TextEditingController();
 
-    // ✅ itemId generiši JEDNOM po otvaranju dijaloga (idempotency)
     final itemId = const Uuid().v4();
-
-    // ✅ IMPORTANT: saving mora biti VAN builder-a da se ne resetuje
     bool saving = false;
 
     showDialog(
@@ -266,7 +332,6 @@ class _OrderDetailScreenState extends ConsumerState<OrderDetailScreen> {
           Future<void> submit() async {
             if (saving) return;
 
-            // ✅ zaključaj ODMAH (bez da se resetuje)
             saving = true;
             setLocal(() {});
 
@@ -287,7 +352,6 @@ class _OrderDetailScreenState extends ConsumerState<OrderDetailScreen> {
               if (!context.mounted) return;
               Navigator.pop(context);
             } catch (_) {
-              // ako pukne mreža/DB, vrati dugme u normalu
               saving = false;
               if (context.mounted) setLocal(() {});
             }

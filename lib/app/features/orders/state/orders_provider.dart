@@ -130,4 +130,14 @@ class OrdersNotifier extends Notifier<OrdersState> {
       state = state.copyWith(error: e.toString());
     }
   }
+
+  Future<void> markReadyForPickup(String orderId) async {
+    state = state.copyWith(error: null);
+    try {
+      await _service.markReadyForPickup(orderId);
+      await load();
+    } catch (e) {
+      state = state.copyWith(error: e.toString());
+    }
+  }
 }

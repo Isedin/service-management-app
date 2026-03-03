@@ -96,4 +96,11 @@ class OrdersService {
       },
     );
   }
+
+  Future<void> markReadyForPickup(String orderId) async {
+    await _client.rpc(
+      'mark_order_ready_for_pickup',
+      params: {'p_order_id': orderId},
+    );
+  }
 }
