@@ -1,21 +1,23 @@
 // u signup flow-u
 import 'package:flutter/material.dart';
+import 'package:service_manegement_app/app/features/orders/state/auth_provider.dart';
 import 'package:service_manegement_app/core/ui/snack.dart';
 import 'package:service_manegement_app/core/ui/widgets/primary_button.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
 import '../../business/data/business_service.dart';
-import '../../auth/data/auth_service.dart';
 import '../../auth/presentation/login_screen.dart';
 import '../../../features/orders/presentation/dashboard_screen.dart';
+import 'package:flutter_riverpod/flutter_riverpod.dart';
 
-class CreateBusinessScreen extends StatefulWidget {
+class CreateBusinessScreen extends ConsumerStatefulWidget {
   const CreateBusinessScreen({super.key});
 
   @override
-  State<CreateBusinessScreen> createState() => _CreateBusinessScreenState();
+  ConsumerState<CreateBusinessScreen> createState() =>
+      _CreateBusinessScreenState();
 }
 
-class _CreateBusinessScreenState extends State<CreateBusinessScreen> {
+class _CreateBusinessScreenState extends ConsumerState<CreateBusinessScreen> {
   final _nameCtrl = TextEditingController();
   final _fullNameCtrl = TextEditingController();
   String _type = 'carpet_cleaning';
@@ -33,7 +35,7 @@ class _CreateBusinessScreenState extends State<CreateBusinessScreen> {
         actions: [
           IconButton(
             onPressed: () async {
-              await AuthService().logout();
+              await ref.read(authServiceProvider).logout();
               if (!mounted) return;
               Navigator.pushReplacement(
                 context,
@@ -113,7 +115,6 @@ class _CreateBusinessScreenState extends State<CreateBusinessScreen> {
             ? null
             : _fullNameCtrl.text.trim(),
       );
-      
 
       if (!mounted) return;
       Navigator.pushReplacement(

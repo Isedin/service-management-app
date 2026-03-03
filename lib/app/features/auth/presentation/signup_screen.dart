@@ -1,54 +1,44 @@
 import 'package:flutter/material.dart';
-import 'package:service_manegement_app/app/features/auth/data/auth_service.dart';
 import 'package:service_manegement_app/core/ui/snack.dart';
 import 'package:service_manegement_app/app/features/auth/presentation/login_screen.dart';
 import 'package:service_manegement_app/core/ui/widgets/primary_button.dart';
+import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:service_manegement_app/app/features/orders/state/auth_provider.dart';
 
-class SignupScreen extends StatefulWidget {
+class SignupScreen extends ConsumerStatefulWidget {
   const SignupScreen({super.key});
 
   @override
-  State<SignupScreen> createState() => _SignupScreenState();
+  ConsumerState<SignupScreen> createState() => _SignupScreenState();
 }
 
-class _SignupScreenState extends State<SignupScreen> {
+class _SignupScreenState extends ConsumerState<SignupScreen> {
   TextEditingController emailController = TextEditingController();
   TextEditingController passwordController = TextEditingController();
-  final AuthService _authService = AuthService();
   bool isLoading = false;
   bool isPasswordHidden = true;
 
-  void _signUp() async {
-    String email = emailController.text.trim();
-    String password = passwordController.text.trim();
+  Future<void> _signUp() async {
+    final email = emailController.text.trim();
+    final password = passwordController.text.trim();
 
-    // validate email formate
-    if (!email.contains(".com")) {
-      showSnackBar(context, "Invalid email. It must contain .com", Colors.red);
-    }
-    setState(() {
-      isLoading = true;
-    });
-    final result = await _authService.signup(email, password);
+    setState(() => isLoading = true);
+
+    final auth = ref.read(authServiceProvider); // ✅
+    final result = await auth.signup(email, password);
+
+    if (!mounted) return;
+
+    setState(() => isLoading = false);
+
     if (result == null) {
-      // success case
-      setState(() {
-        isLoading = false;
-      });
-      showSnackBar(
-        context,
-        "Signup Successful! Now Turn to Login",
-        Colors.green,
-      );
+      showSnackBar(context, "Signup Successful! Now go to Login", Colors.green);
       Navigator.pushReplacement(
         context,
-        MaterialPageRoute(builder: (_) => LoginScreen()),
+        MaterialPageRoute(builder: (_) => const LoginScreen()),
       );
     } else {
-      setState(() {
-        isLoading = false;
-      });
-      showSnackBar(context, "Signup Failed:$result", Colors.red);
+      showSnackBar(context, "Signup Failed: $result", Colors.red);
     }
   }
 
@@ -108,14 +98,14 @@ class _SignupScreenState extends State<SignupScreen> {
                   mainAxisAlignment: MainAxisAlignment.end,
                   children: [
                     Text(
-                      "Already havea na account? ",
+                      "Already have an account? ",
                       style: TextStyle(fontSize: 18),
                     ),
                     GestureDetector(
                       onTap: () {
                         Navigator.pushReplacement(
                           context,
-                          MaterialPageRoute(builder: (_) => LoginScreen()),
+                          MaterialPageRoute(builder: (_) => const LoginScreen()),
                         );
                       },
                       child: Text(

@@ -29,12 +29,12 @@ class _OrderDetailScreenState extends ConsumerState<OrderDetailScreen> {
     });
   }
 
-  String _hhmm(DateTime dt) {
-    final t = dt.toLocal();
-    final h = t.hour.toString().padLeft(2, '0');
-    final m = t.minute.toString().padLeft(2, '0');
-    return '$h:$m';
-  }
+      String _hhmm(DateTime dt) {
+        final t = dt.toLocal();
+        final h = t.hour.toString().padLeft(2, '0');
+        final m = t.minute.toString().padLeft(2, '0');
+        return '$h:$m';
+      }
 
   @override
   Widget build(BuildContext context) {
@@ -69,9 +69,7 @@ class _OrderDetailScreenState extends ConsumerState<OrderDetailScreen> {
     String label = "Pošalji SMS: Tepisi gotovi";
     if (smsState.alreadySent && smsState.sentAt != null) {
       final t = smsState.sentAt!.toLocal();
-      final hh = t.hour.toString().padLeft(2, '0');
-      final mm = t.minute.toString().padLeft(2, '0');
-      label = "Poslano u $hh:$mm";
+      label = "Poslano u ${_hhmm(t)}";
     }
 
     return Scaffold(

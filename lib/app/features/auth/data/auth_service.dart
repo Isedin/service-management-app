@@ -1,7 +1,9 @@
 import 'package:supabase_flutter/supabase_flutter.dart';
 
 class AuthService {
-  final SupabaseClient supabase = Supabase.instance.client;
+  final SupabaseClient supabase;
+
+  AuthService(this.supabase);
 
   Future<String?> signup(String email, String password) async {
     try {

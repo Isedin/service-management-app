@@ -1,8 +1,8 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:service_manegement_app/app/auth_gate.dart';
-import 'package:service_manegement_app/app/features/auth/data/auth_service.dart';
 import 'package:service_manegement_app/app/features/auth/presentation/signup_screen.dart';
+import 'package:service_manegement_app/app/features/orders/state/auth_provider.dart';
 import 'package:service_manegement_app/core/ui/snack.dart';
 import 'package:service_manegement_app/core/ui/widgets/primary_button.dart';
 
@@ -16,35 +16,29 @@ class LoginScreen extends ConsumerStatefulWidget {
 class _LoginScreenState extends ConsumerState<LoginScreen> {
   TextEditingController emailController = TextEditingController();
   TextEditingController passwordController = TextEditingController();
-  final AuthService _authService = AuthService();
   bool isLoadin = false;
   bool isPasswordHidden = true;
 
-  void _logIn() async {
-    String email = emailController.text.trim();
-    String password = passwordController.text.trim();
+  Future<void> _logIn() async {
+    final email = emailController.text.trim();
+    final password = passwordController.text.trim();
+
+    setState(() => isLoadin = true);
+
+    final auth = ref.read(authServiceProvider); // ✅
+    final result = await auth.login(email, password);
+
     if (!mounted) return;
-    setState(() {
-      isLoadin = true;
-    });
-    final result = await _authService.login(email, password);
+
+    setState(() => isLoadin = false);
+
     if (result == null) {
-      // success case
-      if (!mounted) return;
-      setState(() {
-        isLoadin = false;
-      });
       Navigator.pushReplacement(
         context,
         MaterialPageRoute(builder: (_) => AuthGate()),
-        // MaterialPageRoute(builder: (_) => HomeScreen()),
       );
     } else {
-      if (!mounted) return;
-      setState(() {
-        isLoadin = false;
-      });
-      showSnackBar(context, "Signup Failed:$result", Colors.red);
+      showSnackBar(context, "Login Failed: $result", Colors.red);
     }
   }
 

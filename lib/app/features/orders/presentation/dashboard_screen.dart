@@ -1,7 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:service_manegement_app/app/features/orders/state/auth_provider.dart';
 import 'package:service_manegement_app/app/features/orders/state/business_provider.dart';
-import 'package:supabase_flutter/supabase_flutter.dart';
 import 'package:service_manegement_app/app/features/auth/presentation/login_screen.dart';
 import '../state/orders_provider.dart';
 import 'orders_list_screen.dart';
@@ -36,9 +36,11 @@ class _DashboardScreenState extends ConsumerState<DashboardScreen> {
         actions: [
           IconButton(
             onPressed: () async {
-              await Supabase.instance.client.auth.signOut();
               // očisti cached business podatke nakon logout-a
               ref.invalidate(businessProvider);
+              ref.invalidate(ordersProvider);
+              // pa logout preko servisa
+              await ref.read(authServiceProvider).logout();
               if (!mounted) return;
               Navigator.pushReplacement(
                 context,
