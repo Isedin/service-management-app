@@ -37,4 +37,25 @@ class BusinessService {
       rethrow;
     }
   }
+
+  Future<Map<String, dynamic>> loadSettings() async {
+    final bizId = await _client.rpc('current_business_id');
+
+    final res = await _client
+        .from('business_settings')
+        .select()
+        .eq('business_id', bizId)
+        .single();
+
+    return (res as Map).cast<String, dynamic>();
+  }
+
+  Future<void> updateContactPhone(String phone) async {
+    final bizId = await _client.rpc('current_business_id');
+
+    await _client
+        .from('business_settings')
+        .update({'contact_phone': phone})
+        .eq('business_id', bizId);
+  }
 }

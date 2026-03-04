@@ -151,7 +151,7 @@ class _OrderFormScreenState extends ConsumerState<OrderFormScreen> {
     FocusScope.of(context).unfocus();
 
     // ✅ vrati listener u normalu nakon što se UI smiri
-    Future.microtask(() {
+    WidgetsBinding.instance.addPostFrameCallback((_) {
       _suppressCustomerSearch = false;
     });
   }
@@ -172,7 +172,7 @@ class _OrderFormScreenState extends ConsumerState<OrderFormScreen> {
   @override
   Widget build(BuildContext context) {
     return GestureDetector(
-      behavior: HitTestBehavior.opaque,
+      behavior: HitTestBehavior.deferToChild,
       onTap: () => _hideSuggestions(),
       child: Scaffold(
         appBar: AppBar(title: const Text('Nova narudžba')),
@@ -293,7 +293,7 @@ class _OrderFormScreenState extends ConsumerState<OrderFormScreen> {
   }
 
   Future<void> _save() async {
-    _hideSuggestions(); // ✅ sakrij dropdown prije save
+    _hideSuggestions();
 
     if (_nameCtrl.text.trim().isEmpty || _phoneCtrl.text.trim().isEmpty) {
       showSnackBar(context, 'Popuni obavezna polja', Colors.red);
@@ -302,22 +302,27 @@ class _OrderFormScreenState extends ConsumerState<OrderFormScreen> {
 
     setState(() => _loading = true);
 
-    await ref
-        .read(ordersProvider.notifier)
-        .create(
-          customerName: _nameCtrl.text.trim(),
-          customerPhone: _phoneCtrl.text.trim(),
-          mode: isDropoff ? 'dropoff' : 'pickup_delivery',
-          carpetCount: carpetCount,
-          stairCount: stairCount,
-          blanketSmallCount: smallBlankets,
-          blanketLargeCount: largeBlankets,
-        );
+    try {
+      await ref
+          .read(ordersProvider.notifier)
+          .create(
+            customerName: _nameCtrl.text.trim(),
+            customerPhone: _phoneCtrl.text.trim(),
+            mode: isDropoff ? 'dropoff' : 'pickup_delivery',
+            carpetCount: carpetCount,
+            stairCount: stairCount,
+            blanketSmallCount: smallBlankets,
+            blanketLargeCount: largeBlankets,
+          );
 
-    if (!mounted) return;
-    setState(() => _loading = false);
-
-    Navigator.pop(context);
+      if (!mounted) return;
+      Navigator.pop(context);
+    } catch (e) {
+      if (!mounted) return;
+      showSnackBar(context, 'Greška: $e', Colors.red);
+    } finally {
+      if (mounted) setState(() => _loading = false);
+    }
   }
 }
 

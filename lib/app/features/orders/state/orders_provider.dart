@@ -1,3 +1,5 @@
+import 'dart:async';
+
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
 import '../data/orders_service.dart';
@@ -42,8 +44,22 @@ final ordersProvider = NotifierProvider<OrdersNotifier, OrdersState>(
 class OrdersNotifier extends Notifier<OrdersState> {
   OrdersService get _service => ref.read(ordersServiceProvider);
 
+  RealtimeChannel? _ordersChannel; // ✅ čuvamo kanal
+  Timer? _rtDebounce;
+
   @override
-  OrdersState build() => const OrdersState();
+  OrdersState build() {
+    _subscribeRealtime();
+
+    // ✅ cleanup kad provider nestane (logout, hot reload, dispose, itd.)
+    ref.onDispose(() {
+      _rtDebounce?.cancel();
+      _ordersChannel?.unsubscribe();
+      _ordersChannel = null;
+    });
+
+    return const OrdersState();
+  }
 
   Future<void> load() async {
     state = state.copyWith(isLoading: true, error: null);
@@ -94,7 +110,6 @@ class OrdersNotifier extends Notifier<OrdersState> {
   ) async {
     state = state.copyWith(error: null);
     try {
-      print("ADD CARPET CALLED: $itemId");
       await _service.addMeasuredCarpetCm(
         orderId: orderId,
         lengthCm: lCm,
@@ -125,7 +140,7 @@ class OrdersNotifier extends Notifier<OrdersState> {
         lengthCm: lCm,
         widthCm: wCm,
       );
-      await load(); // osvježi orders list (total_amount, itd)
+      await load();
     } catch (e) {
       state = state.copyWith(error: e.toString());
     }
@@ -139,5 +154,29 @@ class OrdersNotifier extends Notifier<OrdersState> {
     } catch (e) {
       state = state.copyWith(error: e.toString());
     }
+  }
+
+  void _subscribeRealtime() {
+    final client = Supabase.instance.client;
+
+    // ✅ safety: ako build pozove opet (hot reload / rebuild), ugasi stari
+    _ordersChannel?.unsubscribe();
+
+    _ordersChannel = client
+        .channel('orders_changes_${client.auth.currentUser?.id ?? "anon"}')
+        .onPostgresChanges(
+          event: PostgresChangeEvent.all,
+          schema: 'public',
+          table: 'orders',
+          callback: (_) => _onRealtimeChange(),
+        )
+        .subscribe();
+  }
+
+  void _onRealtimeChange() {
+    _rtDebounce?.cancel();
+    _rtDebounce = Timer(const Duration(milliseconds: 500), () {
+      load();
+    });
   }
 }

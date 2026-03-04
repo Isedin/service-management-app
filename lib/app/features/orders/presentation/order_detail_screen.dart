@@ -29,12 +29,12 @@ class _OrderDetailScreenState extends ConsumerState<OrderDetailScreen> {
     });
   }
 
-      String _hhmm(DateTime dt) {
-        final t = dt.toLocal();
-        final h = t.hour.toString().padLeft(2, '0');
-        final m = t.minute.toString().padLeft(2, '0');
-        return '$h:$m';
-      }
+  String _hhmm(DateTime dt) {
+    final t = dt.toLocal();
+    final h = t.hour.toString().padLeft(2, '0');
+    final m = t.minute.toString().padLeft(2, '0');
+    return '$h:$m';
+  }
 
   @override
   Widget build(BuildContext context) {
@@ -109,14 +109,24 @@ class _OrderDetailScreenState extends ConsumerState<OrderDetailScreen> {
                 ),
                 future: _service.fetchOrderItems(widget.orderId),
                 builder: (context, snap) {
-                  if (!snap.hasData) {
+                  if (snap.connectionState == ConnectionState.waiting) {
                     return const Padding(
                       padding: EdgeInsets.symmetric(vertical: 10),
                       child: Center(child: CircularProgressIndicator()),
                     );
                   }
 
-                  final items = snap.data!;
+                  if (snap.hasError) {
+                    return Padding(
+                      padding: const EdgeInsets.symmetric(vertical: 10),
+                      child: Text(
+                        'Greška pri učitavanju stavki: ${snap.error}',
+                        style: const TextStyle(color: Colors.red),
+                      ),
+                    );
+                  }
+
+                  final items = snap.data ?? [];
                   if (items.isEmpty)
                     return const Text("Nema unesenih stavki još.");
 
@@ -251,10 +261,7 @@ class _OrderDetailScreenState extends ConsumerState<OrderDetailScreen> {
                       (!canClose || smsState.isLoading || smsState.alreadySent)
                       ? null
                       : () async {
-                          final ok = await smsNotifier.send(
-                            message:
-                                "Poštovani, Vaši tepisi su gotovi. Možete ih preuzeti. Hvala!",
-                          );
+                          final ok = await smsNotifier.send();
 
                           if (!context.mounted) return;
 

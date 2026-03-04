@@ -1,8 +1,8 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
-import 'package:service_manegement_app/app/features/orders/state/auth_provider.dart';
 import 'package:service_manegement_app/app/features/orders/state/business_provider.dart';
 import 'package:service_manegement_app/app/features/auth/presentation/login_screen.dart';
+import 'package:service_manegement_app/core/utils/logout_helper.dart';
 import '../state/orders_provider.dart';
 import 'orders_list_screen.dart';
 import 'order_form_screen.dart';
@@ -35,19 +35,17 @@ class _DashboardScreenState extends ConsumerState<DashboardScreen> {
         ),
         actions: [
           IconButton(
+            icon: const Icon(Icons.logout),
             onPressed: () async {
-              // očisti cached business podatke nakon logout-a
-              ref.invalidate(businessProvider);
-              ref.invalidate(ordersProvider);
-              // pa logout preko servisa
-              await ref.read(authServiceProvider).logout();
+              await performLogout(ref);
+
               if (!mounted) return;
+
               Navigator.pushReplacement(
                 context,
                 MaterialPageRoute(builder: (_) => const LoginScreen()),
               );
             },
-            icon: const Icon(Icons.logout),
           ),
         ],
       ),
