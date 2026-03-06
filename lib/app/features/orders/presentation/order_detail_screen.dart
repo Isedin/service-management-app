@@ -1,7 +1,10 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:service_manegement_app/app/features/orders/data/orders_service.dart';
+import 'package:service_manegement_app/app/features/orders/widgets/carpet_item_row.dart';
+import 'package:service_manegement_app/app/features/orders/widgets/order_total_summary.dart';
 import 'package:service_manegement_app/core/ui/snack.dart';
+import 'package:service_manegement_app/core/utils/pricing_providers.dart';
 import 'package:uuid/uuid.dart';
 
 import '../state/orders_provider.dart';
@@ -23,7 +26,6 @@ class _OrderDetailScreenState extends ConsumerState<OrderDetailScreen> {
     super.initState();
     _service = ref.read(ordersServiceProvider);
 
-    // ✅ init SMS state za ovaj order
     WidgetsBinding.instance.addPostFrameCallback((_) {
       ref.read(smsReadyProvider.notifier).init(widget.orderId);
     });
@@ -38,7 +40,6 @@ class _OrderDetailScreenState extends ConsumerState<OrderDetailScreen> {
 
   @override
   Widget build(BuildContext context) {
-    print("ORDER DETAIL orderId: ${widget.orderId}");
     final p = ref.watch(ordersProvider);
 
     final order = p.orders.any((x) => x.id == widget.orderId)
@@ -61,15 +62,14 @@ class _OrderDetailScreenState extends ConsumerState<OrderDetailScreen> {
 
     final notDone = order.measuredCarpetCount < order.plannedCarpetCount;
     final canAddCarpet = order.measuredCarpetCount < order.plannedCarpetCount;
-    final canClose = !canAddCarpet; // tek kad su svi tepisi uneseni
+    final canClose = !canAddCarpet;
 
     final smsState = ref.watch(smsReadyProvider);
     final smsNotifier = ref.read(smsReadyProvider.notifier);
 
-    String label = "Pošalji SMS: Tepisi gotovi";
+    var smsLabel = "Pošalji SMS: Tepisi gotovi";
     if (smsState.alreadySent && smsState.sentAt != null) {
-      final t = smsState.sentAt!.toLocal();
-      label = "Poslano u ${_hhmm(t)}";
+      smsLabel = "Poslano u ${_hhmm(smsState.sentAt!)}";
     }
 
     return Scaffold(
@@ -127,16 +127,16 @@ class _OrderDetailScreenState extends ConsumerState<OrderDetailScreen> {
                   }
 
                   final items = snap.data ?? [];
-                  if (items.isEmpty)
-                    return const Text("Nema unesenih stavki još.");
+                  if (items.isEmpty) return const Text("Nema unesenih stavki.");
 
-                  num sumType(String type) => items
+                  double sumType(String type) => items
                       .where((x) => x['type'] == type)
                       .fold<num>(
                         0,
                         (s, e) => s + ((e['line_total'] as num?) ?? 0),
-                      );
-
+                      )
+                      .toDouble();
+                  final pricePerM2 = ref.watch(pricePerM2Provider);
                   final carpets = items
                       .where((x) => x['type'] == 'carpet')
                       .toList();
@@ -159,37 +159,59 @@ class _OrderDetailScreenState extends ConsumerState<OrderDetailScreen> {
                             padding: const EdgeInsets.all(12),
                             child: Column(
                               children: [
-                                _rowLine("Tepih (cm)", "Iznos", bold: true),
+                                Row(
+                                  children: const [
+                                    Expanded(
+                                      flex: 4,
+                                      child: Text(
+                                        "Tepih (cm)",
+                                        style: TextStyle(
+                                          fontWeight: FontWeight.bold,
+                                        ),
+                                      ),
+                                    ),
+                                    Expanded(
+                                      flex: 3,
+                                      child: Text(
+                                        "m²",
+                                        textAlign: TextAlign.center,
+                                        style: TextStyle(
+                                          fontWeight: FontWeight.bold,
+                                        ),
+                                      ),
+                                    ),
+                                    Expanded(
+                                      flex: 3,
+                                      child: Text(
+                                        "Iznos",
+                                        textAlign: TextAlign.right,
+                                        style: TextStyle(
+                                          fontWeight: FontWeight.bold,
+                                        ),
+                                      ),
+                                    ),
+                                  ],
+                                ),
                                 const Divider(),
-                                ...carpets.map((c) {
-                                  final lCm =
-                                      ((((c['length_m'] as num?) ?? 0) * 100))
-                                          .round();
-                                  final wCm =
-                                      ((((c['width_m'] as num?) ?? 0) * 100))
-                                          .round();
-                                  final total =
-                                      (((c['line_total'] as num?) ?? 0))
-                                          .toStringAsFixed(2);
 
-                                  return InkWell(
+                                ...carpets.map((c) {
+                                  return CarpetItemRow(
+                                    lengthM: (c['length_m'] as num?) ?? 0,
+                                    widthM: (c['width_m'] as num?) ?? 0,
+                                    lineTotal: (c['line_total'] as num?) ?? 0,
+                                    pricePerM2: pricePerM2,
                                     onTap: () => _editCarpetDialog(
                                       itemId: c['id'].toString(),
-                                      currentLCm: lCm.toDouble(),
-                                      currentWCm: wCm.toDouble(),
-                                    ),
-                                    child: Padding(
-                                      padding: const EdgeInsets.symmetric(
-                                        vertical: 6,
-                                      ),
-                                      child: Row(
-                                        mainAxisAlignment:
-                                            MainAxisAlignment.spaceBetween,
-                                        children: [
-                                          Text("$lCm x $wCm cm"),
-                                          Text("$total KM"),
-                                        ],
-                                      ),
+                                      currentLCm:
+                                          ((((c['length_m'] as num?) ?? 0) *
+                                                  100))
+                                              .round()
+                                              .toDouble(),
+                                      currentWCm:
+                                          ((((c['width_m'] as num?) ?? 0) *
+                                                  100))
+                                              .round()
+                                              .toDouble(),
                                     ),
                                   );
                                 }),
@@ -199,24 +221,13 @@ class _OrderDetailScreenState extends ConsumerState<OrderDetailScreen> {
                         ),
 
                       const SizedBox(height: 10),
-                      _rowLine(
-                        "Gazista",
-                        "${sumType('stair').toStringAsFixed(2)} KM",
-                      ),
-                      _rowLine(
-                        "Deke male",
-                        "${sumType('blanket_small').toStringAsFixed(2)} KM",
-                      ),
-                      _rowLine(
-                        "Deke velike",
-                        "${sumType('blanket_large').toStringAsFixed(2)} KM",
-                      ),
 
-                      const Divider(height: 24),
-                      _rowLine(
-                        "TOTAL",
-                        "${order.totalAmount.toStringAsFixed(2)} KM",
-                        bold: true,
+                      OrderTotalSummary(
+                        totalAmount: order.totalAmount,
+                        sumStair: sumType('stair'),
+                        sumBlanketSmall: sumType('blanket_small'),
+                        sumBlanketLarge: sumType('blanket_large'),
+                        pricePerM2: pricePerM2,
                       ),
 
                       if (p.error != null) ...[
@@ -243,7 +254,6 @@ class _OrderDetailScreenState extends ConsumerState<OrderDetailScreen> {
           child: Column(
             mainAxisSize: MainAxisSize.min,
             children: [
-              // 1) Add carpet
               SizedBox(
                 width: double.infinity,
                 child: ElevatedButton(
@@ -252,8 +262,6 @@ class _OrderDetailScreenState extends ConsumerState<OrderDetailScreen> {
                 ),
               ),
               const SizedBox(height: 12),
-
-              // 2) SMS button (samo kad je order “gotov”)
               SizedBox(
                 width: double.infinity,
                 child: ElevatedButton.icon(
@@ -262,7 +270,6 @@ class _OrderDetailScreenState extends ConsumerState<OrderDetailScreen> {
                       ? null
                       : () async {
                           final ok = await smsNotifier.send();
-
                           if (!context.mounted) return;
 
                           if (ok) {
@@ -286,12 +293,10 @@ class _OrderDetailScreenState extends ConsumerState<OrderDetailScreen> {
                           child: CircularProgressIndicator(strokeWidth: 2),
                         )
                       : const Icon(Icons.sms),
-                  label: Text(label),
+                  label: Text(smsLabel),
                 ),
               ),
               const SizedBox(height: 12),
-
-              // 3) Close
               SizedBox(
                 width: double.infinity,
                 child: ElevatedButton(
@@ -302,22 +307,6 @@ class _OrderDetailScreenState extends ConsumerState<OrderDetailScreen> {
             ],
           ),
         ),
-      ),
-    );
-  }
-
-  static Widget _rowLine(String left, String right, {bool bold = false}) {
-    final style = TextStyle(
-      fontWeight: bold ? FontWeight.bold : FontWeight.normal,
-    );
-    return Padding(
-      padding: const EdgeInsets.symmetric(vertical: 4),
-      child: Row(
-        mainAxisAlignment: MainAxisAlignment.spaceBetween,
-        children: [
-          Text(left, style: style),
-          Text(right, style: style),
-        ],
       ),
     );
   }
@@ -336,13 +325,11 @@ class _OrderDetailScreenState extends ConsumerState<OrderDetailScreen> {
         builder: (context, setLocal) {
           Future<void> submit() async {
             if (saving) return;
-
             saving = true;
             setLocal(() {});
 
             final l = double.tryParse(lengthCtrl.text.trim()) ?? 0;
             final w = double.tryParse(widthCtrl.text.trim()) ?? 0;
-
             if (l <= 0 || w <= 0) {
               saving = false;
               setLocal(() {});
@@ -412,6 +399,7 @@ class _OrderDetailScreenState extends ConsumerState<OrderDetailScreen> {
     final widthCtrl = TextEditingController(
       text: currentWCm.toStringAsFixed(0),
     );
+
     bool saving = false;
 
     showDialog(
@@ -488,6 +476,7 @@ class _OrderDetailScreenState extends ConsumerState<OrderDetailScreen> {
               await ref
                   .read(ordersProvider.notifier)
                   .closeAndDelete(widget.orderId);
+
               if (!mounted) return;
               Navigator.pop(context);
               Navigator.pop(context);

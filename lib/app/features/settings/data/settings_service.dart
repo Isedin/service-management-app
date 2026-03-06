@@ -1,27 +1,33 @@
+// lib/app/features/settings/data/settings_service.dart
 import 'package:supabase_flutter/supabase_flutter.dart';
 
-class BusinessSettings {
-  final double pricePerM2;
-  final double stairPrice;
-  final double blanketSmall;
-  final double blanketLarge;
-  final double discountRate;
+/// Legacy DTO (koristi se samo ako negdje još imaš staru logiku).
+/// Bitno: NE zove se BusinessSettings da ne kolizira sa domain modelom.
+class LegacyBusinessSettings {
+  final double carpetPricePerM2;
+  final double stairPricePerPiece;
+  final double blanketSmallPrice;
+  final double blanketLargePrice;
+  final double dropoffDiscountRate;
 
-  BusinessSettings({
-    required this.pricePerM2,
-    required this.stairPrice,
-    required this.blanketSmall,
-    required this.blanketLarge,
-    required this.discountRate,
+  LegacyBusinessSettings({
+    required this.carpetPricePerM2,
+    required this.stairPricePerPiece,
+    required this.blanketSmallPrice,
+    required this.blanketLargePrice,
+    required this.dropoffDiscountRate,
   });
 
-  factory BusinessSettings.fromMap(Map<String, dynamic> map) {
-    return BusinessSettings(
-      pricePerM2: (map['price_per_m2'] as num).toDouble(),
-      stairPrice: (map['stair_price_per_piece'] as num).toDouble(),
-      blanketSmall: (map['blanket_small_price'] as num).toDouble(),
-      blanketLarge: (map['blanket_large_price'] as num).toDouble(),
-      discountRate: (map['dropoff_discount_rate'] as num).toDouble(),
+  factory LegacyBusinessSettings.fromMap(Map<String, dynamic> map) {
+    double d(dynamic x) =>
+        (x is num) ? x.toDouble() : double.tryParse('$x') ?? 0;
+
+    return LegacyBusinessSettings(
+      carpetPricePerM2: d(map['carpet_price_per_m2']),
+      stairPricePerPiece: d(map['stair_price_per_piece']),
+      blanketSmallPrice: d(map['blanket_small_price']),
+      blanketLargePrice: d(map['blanket_large_price']),
+      dropoffDiscountRate: d(map['dropoff_discount_rate']),
     );
   }
 }
@@ -30,28 +36,36 @@ class SettingsService {
   final SupabaseClient _client;
   SettingsService(this._client);
 
-  Future<BusinessSettings> getSettings() async {
-    final data = await _client.from('business_settings').select().single();
+  /// Ako ti ovo treba samo za "read", RLS će automatski vratiti settings za current business.
+  Future<LegacyBusinessSettings> getLegacySettings() async {
+    final data = await _client
+        .from('business_settings')
+        .select(
+          'carpet_price_per_m2, stair_price_per_piece, blanket_small_price, blanket_large_price, dropoff_discount_rate',
+        )
+        .single();
 
-    return BusinessSettings.fromMap(data);
+    return LegacyBusinessSettings.fromMap(data);
   }
 
-  Future<void> upsertSettings({
-    required double pricePerM2,
-    required double stairPrice,
-    required double blanketSmall,
-    required double blanketLarge,
-    required double discountRate,
+  /// Ako ti još negdje treba "upsert", koristi prave kolone.
+  Future<void> upsertLegacySettings({
+    required double carpetPricePerM2,
+    required double stairPricePerPiece,
+    required double blanketSmallPrice,
+    required double blanketLargePrice,
+    required double dropoffDiscountRate,
   }) async {
-    final businessId = (await _client.rpc('current_business_id'));
+    final businessId = await _client.rpc('current_business_id');
 
     await _client.from('business_settings').upsert({
       'business_id': businessId,
-      'price_per_m2': pricePerM2,
-      'stair_price_per_piece': stairPrice,
-      'blanket_small_price': blanketSmall,
-      'blanket_large_price': blanketLarge,
-      'dropoff_discount_rate': discountRate,
+      'carpet_price_per_m2': carpetPricePerM2,
+      'stair_price_per_piece': stairPricePerPiece,
+      'blanket_small_price': blanketSmallPrice,
+      'blanket_large_price': blanketLargePrice,
+      'dropoff_discount_rate': dropoffDiscountRate,
+      'updated_at': DateTime.now().toUtc().toIso8601String(),
     });
   }
 }

@@ -1,5 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:service_manegement_app/app/features/settings/screens/settings_entry_screen.dart';
+import 'package:service_manegement_app/app/features/orders/state/profile_provider.dart';
 import '../state/orders_provider.dart';
 import 'order_detail_screen.dart';
 
@@ -11,6 +13,45 @@ class OrdersListScreen extends ConsumerWidget {
     final p = ref.watch(ordersProvider);
 
     return Scaffold(
+      drawer: Drawer(
+        child: Consumer(
+          builder: (context, ref, _) {
+            final prof = ref.watch(myProfileProvider);
+
+            return ListView(
+              padding: EdgeInsets.zero,
+              children: [
+                const DrawerHeader(
+                  decoration: BoxDecoration(color: Colors.blue),
+                  child: Text(
+                    "Menu",
+                    style: TextStyle(color: Colors.white, fontSize: 18),
+                  ),
+                ),
+                prof.when(
+                  data: (profile) => profile.role == 'owner'
+                      ? ListTile(
+                          leading: const Icon(Icons.settings),
+                          title: const Text("Settings"),
+                          onTap: () {
+                            Navigator.pop(context);
+                            Navigator.push(
+                              context,
+                              MaterialPageRoute(
+                                builder: (_) => const SettingsEntryScreen(),
+                              ),
+                            );
+                          },
+                        )
+                      : const SizedBox.shrink(),
+                  loading: () => const SizedBox.shrink(),
+                  error: (_, __) => const SizedBox.shrink(),
+                ),
+              ],
+            );
+          },
+        ),
+      ),
       appBar: AppBar(
         title: const Text('Narudžbe'),
         actions: [
@@ -20,8 +61,6 @@ class OrdersListScreen extends ConsumerWidget {
           ),
         ],
       ),
-
-      // Tap bilo gdje da ugasi keyboard (da ne “pojede” klikove)
       body: GestureDetector(
         behavior: HitTestBehavior.opaque,
         onTap: () => FocusScope.of(context).unfocus(),
@@ -40,11 +79,9 @@ class OrdersListScreen extends ConsumerWidget {
                     ref.read(ordersProvider.notifier).setSearch(v),
               ),
             ),
-
             Expanded(
               child: Stack(
                 children: [
-                  // Lista je uvijek tu
                   ListView.builder(
                     keyboardDismissBehavior:
                         ScrollViewKeyboardDismissBehavior.onDrag,
@@ -75,15 +112,11 @@ class OrdersListScreen extends ConsumerWidget {
                       );
                     },
                   ),
-
-                  // Loading overlay koji NE blokira tapove
                   if (p.isLoading)
                     const IgnorePointer(
                       ignoring: true,
                       child: Center(child: CircularProgressIndicator()),
                     ),
-
-                  // Error poruka (ne blokira ništa)
                   if (p.error != null)
                     Align(
                       alignment: Alignment.bottomCenter,
